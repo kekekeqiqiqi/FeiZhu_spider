@@ -1,0 +1,41 @@
+# -*- coding: utf-8 -*-
+
+# Define your item pipelines here
+#
+# Don't forget to add your pipeline to the ITEM_PIPELINES setting
+# See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
+
+
+import pymysql
+
+import  csv
+
+
+class FeizhuPipeline(object):
+
+
+    def __init__(self):
+        self.fp_1=open("feizhu_1.csv","a",newline="" ,encoding="utf-8")
+        self.fp_2=open("feizhu_2.csv","a",newline="" ,encoding="utf-8")
+        # self.fieldnames_1=["name","price","day","desc_title","item_data","item_data_coment","item_data_gade"]   # CSV第一行名字
+        # self.fieldnames_2=["name_2","price_2","sell_count","sell_count","sell_count","sell_room","sell_address"]   # CSV第一行名字
+        # self.writer_1 =csv.DictWriter(fieldnames=self.fieldnames_1,f=self.fp_1)
+        # self.writer_2 =csv.DictWriter(fieldnames=self.fieldnames_2,f=self.fp_2)
+        # self.conn=pymysql.connect()
+        self.writer_1=csv.writer(self.fp_1, dialect="excel")
+        self.writer_2=csv.writer(self.fp_2, dialect="excel")
+        pass
+
+
+    def process_item(self, item, spider):
+        print("begin----")
+        if item["note"] == 1:
+             self.writer_1.writerow([item["ffname"],item["price"],item["day"],item["desc_title"],item["item_data"],item["item_data_coment"],item["item_data_gade"]])
+        else:
+            self.writer_2.writerow([item["ffname"], item["price"], item["day"], item["desc_title"], item["item_data"],
+                                    item["item_data_coment"], item["item_data_gade"]])
+
+        return item
+    def close_spider(self, spider):
+        self.fp_1.close()
+        self.fp_2.close()
