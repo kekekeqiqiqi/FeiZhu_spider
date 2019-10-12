@@ -1,0 +1,71 @@
+# -*- coding: utf-8 -*-
+from lxml import etree
+from scrapy import cmdline, Request
+from feizhu.items import  FeizhuItem
+from scrapy.linkextractors import LinkExtractor
+from scrapy.spiders import CrawlSpider, Rule
+from feizhu.spiders.room import RoomSpider
+import requests
+
+class SpiSpider(CrawlSpider):
+    name = 'spi'
+    allowed_domains = ['fliggy.com',"taobao.com","travelsearch.fliggy.com","weibo.com"]
+
+    response=etree.HTML(requests.get('https://www.fliggy.com/dujia/?spm=181.11358650.0.0.30b3223elQVSzF&ttid=sem.000000736').text)
+
+    def add_start_url(url):
+        lists = []
+        for list in url[10:]:
+            for n in range(2,50):
+               lists.append(list+"&pagenum="+str(n))
+        return  lists
+
+    start_urls=add_start_url(response.xpath("//aside//section[@class='nav-section']//li/a/@href"))
+
+    rules = (
+        Rule(LinkExtractor(allow=r'https://traveldetail.fliggy.com.*?'), callback='parse_item',follow=False),
+        Rule(LinkExtractor(allow=r'http://s.fliggy.com/scenic/detail.htm.*?'), callback='parse_popo',follow=False),
+    )
+
+    # 景区门票
+    def parse_popo(self,response):
+
+            #  景区名称
+            name_2 = response.xpath("//div[@class='scenic-desc-wrap']/div/h3/text()").get()
+            #  门票价格
+            price_2 = response.xpath("//div[@class='scenic-price']/span/text()").get()
+            #  销量
+            sell_count = response.xpath("//div[@class='scenic-sell-info']/dl/dd/em/text()").get()
+            #  电话
+            sell_phton = response.xpath("//div[@class='scenic-sell-info']//dl[2]/dd/text()").get()
+            #  开放时间
+            sell_time = response.xpath("//div[@class='scenic-sell-info']//dl[3]/dd/text()").get()
+            #  主题
+            sell_room = response.xpath("//div[@class='scenic-sell-info']//dl[4]/dd/text()").get()
+            #  地址
+            sell_address = response.xpath("//div[@class='scenic-sell-info']//dl[5]/dd/text()").get()
+            yield FeizhuItem(ffname=name_2, price=price_2, day=sell_count, desc_title=sell_phton, item_data=sell_time,
+                             item_data_coment=sell_room, item_data_gade=sell_address, note=2)
+
+    # 跟团游 自由行
+    def parse_item(self, response):
+
+            # 跟团名称
+            name=response.xpath("//h1[@class='title-txt']/span[1]/text()").get()
+            # 价格
+            price=response.xpath("//dl[@class='price-dl']/dd/span/text()").get()
+            # 游玩总时间
+            day=response.xpath("//ul[@class='item-desc bottom-border clearfix']/li[2]//span/text()").getall()
+            # 相关协议
+            desc_title=response.xpath("//div[@class='txt-content clearfix']//p/text()").getall()
+            # 月销量
+            item_data=response.xpath("//ul[@class='info-list']/li[1]/em/text()").get()
+            # 累积评价
+            item_data_coment=response.xpath("//ul[@class='info-list']/li[2]/em/text()").get()
+            #评分
+            item_data_gade=response.xpath("//div[@class='comment-score-container']/span/text()").get()
+            yield FeizhuItem(ffname=name,price=price,day=day,desc_title=desc_title,item_data=item_data,item_data_coment=item_data_coment,item_data_gade=item_data_gade,note=1)
+
+
+
+
