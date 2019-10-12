@@ -1,41 +1,94 @@
 # -*- coding: utf-8 -*-
 
-# Define your item pipelines here
+# Define here the models for your spider middleware
 #
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
+# See documentation in:
+# https://doc.scrapy.org/en/latest/topics/spider-middleware.html
+import re
+
+from scrapy import signals
+from selenium.webdriver import DesiredCapabilities, ActionChains
+import random
 
 
-import pymysql
-
-import  csv
 
 
-class FeizhuPipeline(object):
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from scrapy.http.response.html import HtmlResponse
 
+import time
+
+
+class webdriver_middle(object):
+    heards = ['user-agent:"Mozilla/5.0 (X11; Linux i686; rv:64.0) Gecko/20100101 Firefox/64.0"',
+              'user-agent:"Mozilla/5.0 (Windows NT 6.2; WOW64; rv:63.0) Gecko/20100101 Firefox/63.0"',
+              'user-agent:"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"',
+              'user-agent:"Mozilla/5.0 (compatible; U; ABrowse 0.6; Syllable) AppleWebKit/420+ (KHTML, like Gecko)"',
+              'user-agent:"Mozilla/5.0 (Linux; U; Android 4.1; en-us; GT-N7100 Build/JRO03C) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"']
 
     def __init__(self):
-        self.fp_1=open("feizhu_1.csv","a",newline="" ,encoding="utf-8")
-        self.fp_2=open("feizhu_2.csv","a",newline="" ,encoding="utf-8")
-        # self.fieldnames_1=["name","price","day","desc_title","item_data","item_data_coment","item_data_gade"]   # CSV第一行名字
-        # self.fieldnames_2=["name_2","price_2","sell_count","sell_count","sell_count","sell_room","sell_address"]   # CSV第一行名字
-        # self.writer_1 =csv.DictWriter(fieldnames=self.fieldnames_1,f=self.fp_1)
-        # self.writer_2 =csv.DictWriter(fieldnames=self.fieldnames_2,f=self.fp_2)
-        # self.conn=pymysql.connect()
-        self.writer_1=csv.writer(self.fp_1, dialect="excel")
-        self.writer_2=csv.writer(self.fp_2, dialect="excel")
-        pass
+        self.option = Options()
+        
+        
+        # 让浏览器为开发者模式可以减小被网站查询为爬虫的机率
+        self.option.add_experimental_option('excludeSwitches', ['enable-automation'])
+        # self.option.add_argument('--proxy-server=192.168.136.1')
+        
+        
+        # 设置浏览器为不需要完全加载网页即可翻页
+        desired_capabilities = DesiredCapabilities.CHROME
+        desired_capabilities['pageLoadStrategy'] = 'none'
+        
+        self.option.add_argument(random.choice(self.heards))
+        self.driver = webdriver.Chrome(options=self.option, desired_capabilities=desired_capabilities)
+        
+        #登录页面 
+        request_url = 'https://login.taobao.com/member/login.jhtml?spm=181.60539.1119389.2.5dad5af0NuIlhQ&f=top&redirectURL=https%3A%2F%2Fwww.fliggy.com%2Fdujia%2F%3Fspm%3D181.11358650.0.0.30b3223egnS4bW%26ttid%3Dsem.000000736&ttid=sem.000000736'
+        self.driver.get(request_url)
+        time.sleep(10)
+        
+        # 自动化点击并输入密码实现登录
+        self.driver.find_element_by_id("J_Quick2Static").click()
+        time.sleep(5)
+        self.driver.find_element_by_name("TPL_username").send_keys("  账号   ")
+        self.driver.find_element_by_name("TPL_password").send_keys("  密码   ")
+        time.sleep(5)
+        self.driver.find_element_by_id('J_SubmitStatic').click()
+        time.sleep(10)
+
+    def process_request(self, request, spider):
+        self.driver.get(request.url)
+        time.sleep(5)
+        text = self.driver.page_source
 
 
-    def process_item(self, item, spider):
-        print("begin----")
-        if item["note"] == 1:
-             self.writer_1.writerow([item["ffname"],item["price"],item["day"],item["desc_title"],item["item_data"],item["item_data_coment"],item["item_data_gade"]])
-        else:
-            self.writer_2.writerow([item["ffname"], item["price"], item["day"], item["desc_title"], item["item_data"],
-                                    item["item_data_coment"], item["item_data_gade"]])
+        # 判断是否出现滑块
+        while ((len(re.findall('span class="nc-lang-cnt(.*?)-lang', text))) != 0) :
 
-        return item
-    def close_spider(self, spider):
-        self.fp_1.close()
-        self.fp_2.close()
+            if (len(re.findall('span class="nc-lang-cnt(.*?)_error300', text))) != 0:
+                print('yesyes'*40)
+                self.driver.find_element_by_xpath("//span[@class='nc-lang-cnt']/a").click()
+                time.sleep(1)
+
+            button = self.driver.find_element_by_id('nc_1_n1z')
+            action = ActionChains(self.driver)
+            action.click_and_hold(button).perform()
+            action.reset_actions()
+            action.move_by_offset(300, 0).perform()
+            time.sleep(5)
+            # action.move_by_offset(100, 0).release().perform()
+
+            # 刷新得到的內容
+            text = self.driver.page_source
+            time.sleep(5)
+
+            if (len(re.findall('span class="nc-lang-cnt(.*?)-lang', text))) == 0:
+                self.driver.get(request.url)
+                time.sleep(2)
+                text = self.driver.page_source
+                break
+
+        response = HtmlResponse(url=self.driver.current_url, body=text, request=request, encoding="utf-8")
+
+        return response
