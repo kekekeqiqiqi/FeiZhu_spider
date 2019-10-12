@@ -1,3 +1,12 @@
+
+
+# 2019/10/12
+# 实验室第二次作业
+# 爬取飞猪APP的旅游模块
+# 运用了selenium 和 crawlspider
+# 以及通过修改chromedriver 的代码  " cdc_"  改为  " chr_ "  可以避免自动登录时候弹出不可破解（滑动通过）的滑块
+
+
 # -*- coding: utf-8 -*-
 from lxml import etree
 from scrapy import cmdline, Request
@@ -10,20 +19,24 @@ import requests
 class SpiSpider(CrawlSpider):
     name = 'spi'
     allowed_domains = ['fliggy.com',"taobao.com","travelsearch.fliggy.com","weibo.com"]
-
+    
+    #获取飞猪旅游模块主界面的内容
     response=etree.HTML(requests.get('https://www.fliggy.com/dujia/?spm=181.11358650.0.0.30b3223elQVSzF&ttid=sem.000000736').text)
-
+    
+    # 该函数用来对在主界面爬取的旅游城市的首网页的基础上 增加元素 "pagenum= " 从而实现翻页的效果
     def add_start_url(url):
         lists = []
         for list in url[10:]:
             for n in range(2,50):
                lists.append(list+"&pagenum="+str(n))
         return  lists
-
+    
     start_urls=add_start_url(response.xpath("//aside//section[@class='nav-section']//li/a/@href"))
 
     rules = (
+        # 匹配跟团游的详细网站
         Rule(LinkExtractor(allow=r'https://traveldetail.fliggy.com.*?'), callback='parse_item',follow=False),
+        #匹配景区的详细网站
         Rule(LinkExtractor(allow=r'http://s.fliggy.com/scenic/detail.htm.*?'), callback='parse_popo',follow=False),
     )
 
